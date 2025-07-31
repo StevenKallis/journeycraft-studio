@@ -440,7 +440,7 @@ const HomePage = () => {
           <div className="grid md:grid-cols-4 gap-8">
             <div>
               <h4 className="text-xl font-bold mb-4 bg-sunset-gradient bg-clip-text text-transparent">
-                WanderLux Travel
+                Es-Travel and Tours
               </h4>
               <p className="text-primary-foreground/80">
                 Creating extraordinary travel experiences since 2020.
@@ -467,14 +467,14 @@ const HomePage = () => {
             <div>
               <h5 className="font-semibold mb-4">Contact Info</h5>
               <div className="space-y-2 text-primary-foreground/80">
-                <p>📧 info@wanderlux.com</p>
-                <p>📞 +1 (555) 123-4567</p>
-                <p>📍 123 Travel St, Adventure City</p>
+                <p>📧 estravel@cytanet.com.cy</p>
+                <p>📞 +35799692892</p>
+                <p>📍 Polignostou 15 Limassol, 3082</p>
               </div>
             </div>
           </div>
           <div className="border-t border-primary-foreground/20 mt-8 pt-8 text-center text-primary-foreground/60">
-            <p>&copy; 2024 WanderLux Travel. All rights reserved.</p>
+            <p>&copy; Es-Travel and Tours All rights reserved.</p>
           </div>
         </div>
       </footer>
