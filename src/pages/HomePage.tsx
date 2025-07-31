@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, MapPin, Users, Star, ArrowRight, Play, X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { Calendar, MapPin, Users, Star, ArrowRight, Play, X, LogIn, LogOut } from "lucide-react";
 import heroImage from "@/assets/hero-travel.jpg";
 import mountainPackage from "@/assets/mountain-package.jpg";
 import beachPackage from "@/assets/beach-package.jpg";
@@ -84,6 +86,8 @@ const HomePage = () => {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const { toast } = useToast();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -119,7 +123,20 @@ const HomePage = () => {
             <Button variant="ghost" onClick={() => scrollToSection('packages')}>Packages</Button>
             <Button variant="ghost" onClick={() => scrollToSection('about')}>About</Button>
             <Button variant="ghost" onClick={() => scrollToSection('contact')}>Contact</Button>
-            <Button variant="ghost" onClick={navigateToAdmin}>Admin</Button>
+            {user ? (
+              <>
+                <Button variant="ghost" onClick={navigateToAdmin}>Admin</Button>
+                <Button variant="ghost" onClick={signOut}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Button variant="ghost" onClick={() => navigate('/auth')}>
+                <LogIn className="h-4 w-4 mr-2" />
+                Login
+              </Button>
+            )}
             <Dialog open={showBookingForm} onOpenChange={setShowBookingForm}>
               <DialogTrigger asChild>
                 <Button variant="hero">Book Now</Button>
