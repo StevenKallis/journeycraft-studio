@@ -2,7 +2,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Users, Star, ArrowRight } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { Calendar, MapPin, Users, Star, ArrowRight, Play, X } from "lucide-react";
 import heroImage from "@/assets/hero-travel.jpg";
 import mountainPackage from "@/assets/mountain-package.jpg";
 import beachPackage from "@/assets/beach-package.jpg";
@@ -74,6 +79,29 @@ const newsItems = [
 
 const HomePage = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedPackage, setSelectedPackage] = useState(null);
+  const [selectedNews, setSelectedNews] = useState(null);
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const { toast } = useToast();
+
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    element?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleBooking = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast({
+      title: "Booking Request Submitted!",
+      description: "We'll contact you within 24 hours to confirm your booking.",
+    });
+    setShowBookingForm(false);
+  };
+
+  const navigateToAdmin = () => {
+    window.location.href = '/admin';
+  };
 
   const filteredPackages = selectedCategory === "all" 
     ? travelPackages 
@@ -88,11 +116,51 @@ const HomePage = () => {
             WanderLux Travel
           </h1>
           <div className="flex gap-4">
-            <Button variant="ghost">Packages</Button>
-            <Button variant="ghost">About</Button>
-            <Button variant="ghost">Contact</Button>
-            <Button variant="ghost" onClick={() => window.location.href = '/admin'}>Admin</Button>
-            <Button variant="hero">Book Now</Button>
+            <Button variant="ghost" onClick={() => scrollToSection('packages')}>Packages</Button>
+            <Button variant="ghost" onClick={() => scrollToSection('about')}>About</Button>
+            <Button variant="ghost" onClick={() => scrollToSection('contact')}>Contact</Button>
+            <Button variant="ghost" onClick={navigateToAdmin}>Admin</Button>
+            <Dialog open={showBookingForm} onOpenChange={setShowBookingForm}>
+              <DialogTrigger asChild>
+                <Button variant="hero">Book Now</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Book Your Adventure</DialogTitle>
+                  <DialogDescription>
+                    Fill out this form and we'll contact you to finalize your booking.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleBooking} className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input id="name" placeholder="Enter your full name" required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" placeholder="Enter your email" required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input id="phone" placeholder="Enter your phone number" required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="package">Preferred Package</Label>
+                    <select id="package" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                      <option value="">Select a package</option>
+                      {travelPackages.map(pkg => (
+                        <option key={pkg.id} value={pkg.title}>{pkg.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="message">Special Requests</Label>
+                    <Textarea id="message" placeholder="Any special requests or questions?" />
+                  </div>
+                  <Button type="submit" className="w-full">Submit Booking Request</Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </nav>
@@ -116,19 +184,44 @@ const HomePage = () => {
             with our carefully crafted travel experiences.
           </p>
           <div className="flex gap-4 justify-center">
-            <Button variant="hero" size="lg" className="shadow-hero">
+            <Button variant="hero" size="lg" className="shadow-hero" onClick={() => scrollToSection('packages')}>
               Explore Packages
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-black">
-              Watch Video
-            </Button>
+            <Dialog open={showVideoModal} onOpenChange={setShowVideoModal}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-black">
+                  <Play className="mr-2 h-5 w-5" />
+                  Watch Video
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[800px]">
+                <DialogHeader>
+                  <DialogTitle>Discover WanderLux Travel</DialogTitle>
+                  <button 
+                    onClick={() => setShowVideoModal(false)}
+                    className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </DialogHeader>
+                <div className="aspect-video w-full bg-muted rounded-lg flex items-center justify-center">
+                  <div className="text-center">
+                    <Play className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Video player would be embedded here</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Showcasing our amazing travel destinations and experiences
+                    </p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </section>
 
       {/* Travel Packages Section */}
-      <section className="py-20 px-4">
+      <section id="packages" className="py-20 px-4">
         <div className="container mx-auto">
           <div className="text-center mb-12">
             <h3 className="text-4xl font-bold mb-4">Featured Travel Packages</h3>
@@ -197,9 +290,59 @@ const HomePage = () => {
                       {pkg.rating}
                     </div>
                   </div>
-                  <Button className="w-full" variant="ocean">
-                    View Details
-                  </Button>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button className="w-full" variant="ocean" onClick={() => setSelectedPackage(pkg)}>
+                        View Details
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[600px]">
+                      <DialogHeader>
+                        <DialogTitle>{pkg.title}</DialogTitle>
+                        <DialogDescription>
+                          Complete package details and booking information
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-6">
+                        <img 
+                          src={pkg.image} 
+                          alt={pkg.title}
+                          className="w-full h-64 object-cover rounded-lg"
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            <span className="text-sm">{pkg.duration}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            <span className="text-sm">{pkg.location}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            <span className="text-sm">Max {pkg.maxGuests} guests</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Star className="h-4 w-4 fill-current text-sunset" />
+                            <span className="text-sm">{pkg.rating} rating</span>
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-2">Description</h4>
+                          <p className="text-muted-foreground">{pkg.description}</p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-2xl font-bold">{pkg.price}</span>
+                            <span className="text-muted-foreground ml-2">per person</span>
+                          </div>
+                          <Button variant="hero" onClick={() => setShowBookingForm(true)}>
+                            Book This Package
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             ))}
@@ -231,10 +374,40 @@ const HomePage = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">{item.excerpt}</p>
-                  <Button variant="ghost" className="p-0 h-auto">
-                    Read More
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" className="p-0 h-auto" onClick={() => setSelectedNews(item)}>
+                        Read More
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[600px]">
+                      <DialogHeader>
+                        <DialogTitle>{item.title}</DialogTitle>
+                        <DialogDescription>
+                          {item.category} • {new Date(item.date).toLocaleDateString()}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4">
+                        <p className="text-muted-foreground leading-relaxed">
+                          {item.excerpt}
+                        </p>
+                        <div className="bg-muted/50 p-4 rounded-lg">
+                          <p className="text-sm leading-relaxed">
+                            {item.id === 1 && "Our new sustainable travel initiatives include carbon offset programs, partnerships with eco-friendly accommodations, and support for local conservation efforts. We believe in responsible tourism that preserves the beauty of our destinations for future generations."}
+                            {item.id === 2 && "Take advantage of our early bird special and save 30% on all Alpine Adventure packages when you book before March 31st. This includes our popular Swiss Alps expedition, Austrian mountain tours, and French Alpine experiences."}
+                            {item.id === 3 && "Stay updated with the latest travel requirements including vaccination certificates, COVID-19 testing protocols, and destination-specific safety guidelines. Your safety is our top priority."}
+                          </p>
+                        </div>
+                        <Button variant="hero" className="w-fit" onClick={() => toast({
+                          title: "Thank you for reading!",
+                          description: "Stay tuned for more updates and travel news.",
+                        })}>
+                          Subscribe to Newsletter
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             ))}
@@ -243,7 +416,7 @@ const HomePage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-primary text-primary-foreground py-12 px-4">
+      <footer id="contact" className="bg-primary text-primary-foreground py-12 px-4">
         <div className="container mx-auto">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
@@ -257,10 +430,10 @@ const HomePage = () => {
             <div>
               <h5 className="font-semibold mb-4">Quick Links</h5>
               <ul className="space-y-2 text-primary-foreground/80">
-                <li><a href="#" className="hover:text-sunset transition-colors">Packages</a></li>
-                <li><a href="#" className="hover:text-sunset transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-sunset transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-sunset transition-colors">Blog</a></li>
+                <li><button onClick={() => scrollToSection('packages')} className="hover:text-sunset transition-colors">Packages</button></li>
+                <li><button onClick={() => scrollToSection('about')} className="hover:text-sunset transition-colors">About Us</button></li>
+                <li><button onClick={() => scrollToSection('contact')} className="hover:text-sunset transition-colors">Contact</button></li>
+                <li><button onClick={() => setShowVideoModal(true)} className="hover:text-sunset transition-colors">Blog</button></li>
               </ul>
             </div>
             <div>
