@@ -86,7 +86,7 @@ const HomePage = () => {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const { toast } = useToast();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   const scrollToSection = (id: string) => {
@@ -125,7 +125,9 @@ const HomePage = () => {
             <Button variant="ghost" onClick={() => scrollToSection('contact')}>Contact</Button>
             {user ? (
               <>
-                <Button variant="ghost" onClick={navigateToAdmin}>Admin</Button>
+                {isAdmin && (
+                  <Button variant="ghost" onClick={navigateToAdmin}>Admin</Button>
+                )}
                 <Button variant="ghost" onClick={signOut}>
                   <LogOut className="h-4 w-4 mr-2" />
                   Logout
