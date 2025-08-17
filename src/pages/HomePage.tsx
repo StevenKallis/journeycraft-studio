@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,85 +9,110 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Calendar, MapPin, Users, Star, ArrowRight, Play, X, LogIn, LogOut } from "lucide-react";
+import { Calendar, MapPin, Users, Star, ArrowRight, Play, X, LogIn, LogOut, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-travel.jpg";
 import mountainPackage from "@/assets/mountain-package.jpg";
 import beachPackage from "@/assets/beach-package.jpg";
 import cityPackage from "@/assets/city-package.jpg";
 
-// Mock data - in real app this would come from Supabase
-const travelPackages = [
-  {
-    id: 1,
-    title: "Mountain Adventure Escape",
-    description: "Experience breathtaking mountain views and thrilling adventures in the Swiss Alps.",
-    image: mountainPackage,
-    price: "$2,499",
-    duration: "7 days",
-    location: "Swiss Alps",
-    rating: 4.9,
-    maxGuests: 12,
-    featured: true
-  },
-  {
-    id: 2,
-    title: "Tropical Paradise Getaway",
-    description: "Relax in luxury overwater bungalows with pristine beaches and crystal-clear waters.",
-    image: beachPackage,
-    price: "$3,299",
-    duration: "10 days",
-    location: "Maldives",
-    rating: 4.8,
-    maxGuests: 8,
-    featured: false
-  },
-  {
-    id: 3,
-    title: "Urban Explorer Package",
-    description: "Discover vibrant city life, world-class cuisine, and iconic landmarks.",
-    image: cityPackage,
-    price: "$1,799",
-    duration: "5 days",
-    location: "Tokyo, Japan",
-    rating: 4.7,
-    maxGuests: 16,
-    featured: false
-  }
-];
+// Default images for packages without uploads
+const defaultImages = [mountainPackage, beachPackage, cityPackage];
 
-const newsItems = [
-  {
-    id: 1,
-    title: "New Sustainable Travel Initiatives",
-    excerpt: "We're proud to announce our commitment to eco-friendly travel options and carbon-neutral packages.",
-    date: "2024-01-15",
-    category: "Sustainability"
-  },
-  {
-    id: 2,
-    title: "Early Bird Special: 30% Off Alpine Adventures",
-    excerpt: "Book your mountain getaway before March and save big on our most popular alpine packages.",
-    date: "2024-01-10",
-    category: "Promotions"
-  },
-  {
-    id: 3,
-    title: "Travel Safety Updates",
-    excerpt: "Important information about travel requirements and safety protocols for all destinations.",
-    date: "2024-01-08",
-    category: "Safety"
-  }
-];
+// Types for our data
+interface Package {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  duration: string;
+  location: string;
+  max_guests: number;
+  images: string[];
+  pdfs: string[];
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface NewsItem {
+  id: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  category: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
 
 const HomePage = () => {
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedPackage, setSelectedPackage] = useState(null);
-  const [selectedNews, setSelectedNews] = useState(null);
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const { toast } = useToast();
   const { user, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchPackages();
+    fetchNews();
+  }, []);
+
+  const fetchPackages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setPackages(data || []);
+    } catch (error) {
+      console.error('Error fetching packages:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load travel packages",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchNews = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('news')
+        .select('*')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(6);
+      
+      if (error) throw error;
+      setNews(data || []);
+    } catch (error) {
+      console.error('Error fetching news:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load news updates",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getPackageImage = (pkg: Package, index: number) => {
+    if (pkg.images && pkg.images.length > 0) {
+      return `${supabase.storage.from('package-files').getPublicUrl(pkg.images[0]).data.publicUrl}`;
+    }
+    return defaultImages[index % defaultImages.length];
+  };
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -107,9 +132,18 @@ const HomePage = () => {
     window.location.href = '/admin';
   };
 
-  const filteredPackages = selectedCategory === "all" 
-    ? travelPackages 
-    : travelPackages.filter(pkg => pkg.featured);
+  const filteredPackages = packages;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading travel packages...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -167,7 +201,7 @@ const HomePage = () => {
                     <Label htmlFor="package">Preferred Package</Label>
                     <select id="package" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
                       <option value="">Select a package</option>
-                      {travelPackages.map(pkg => (
+                      {packages.map(pkg => (
                         <option key={pkg.id} value={pkg.title}>{pkg.title}</option>
                       ))}
                     </select>
@@ -249,123 +283,120 @@ const HomePage = () => {
             </p>
           </div>
 
-          {/* Package Filters */}
-          <div className="flex justify-center gap-4 mb-12">
+          {/* Package Filters - Hidden for now since we're showing all packages */}
+          <div className="hidden justify-center gap-4 mb-12">
             <Button 
               variant={selectedCategory === "all" ? "default" : "outline"}
               onClick={() => setSelectedCategory("all")}
             >
               All Packages
             </Button>
-            <Button 
-              variant={selectedCategory === "featured" ? "default" : "outline"}
-              onClick={() => setSelectedCategory("featured")}
-            >
-              Featured
-            </Button>
           </div>
 
           {/* Package Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredPackages.map((pkg) => (
-              <Card key={pkg.id} className="overflow-hidden group hover:shadow-card transition-all duration-300 hover:-translate-y-2">
-                <div className="relative overflow-hidden">
-                  <img 
-                    src={pkg.image} 
-                    alt={pkg.title}
-                    className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  {pkg.featured && (
-                    <Badge className="absolute top-4 left-4 bg-sunset text-sunset-foreground">
-                      Featured
-                    </Badge>
-                  )}
-                  <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                    {pkg.price}
-                  </div>
-                </div>
-                <CardHeader>
-                  <CardTitle className="text-xl">{pkg.title}</CardTitle>
-                  <CardDescription className="text-sm">
-                    {pkg.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground mb-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      {pkg.duration}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      {pkg.location}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Max {pkg.maxGuests}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4 fill-current text-sunset" />
-                      {pkg.rating}
+          {filteredPackages.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No travel packages available at the moment.</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredPackages.map((pkg, index) => (
+                <Card key={pkg.id} className="overflow-hidden group hover:shadow-card transition-all duration-300 hover:-translate-y-2">
+                  <div className="relative overflow-hidden">
+                    <img 
+                      src={getPackageImage(pkg, index)} 
+                      alt={pkg.title}
+                      className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                    <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                      ${pkg.price}
                     </div>
                   </div>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button className="w-full" variant="ocean" onClick={() => setSelectedPackage(pkg)}>
-                        View Details
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
-                      <DialogHeader>
-                        <DialogTitle>{pkg.title}</DialogTitle>
-                        <DialogDescription>
-                          Complete package details and booking information
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="grid gap-6">
-                        <img 
-                          src={pkg.image} 
-                          alt={pkg.title}
-                          className="w-full h-64 object-cover rounded-lg"
-                        />
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            <span className="text-sm">{pkg.duration}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4" />
-                            <span className="text-sm">{pkg.location}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4" />
-                            <span className="text-sm">Max {pkg.maxGuests} guests</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Star className="h-4 w-4 fill-current text-sunset" />
-                            <span className="text-sm">{pkg.rating} rating</span>
-                          </div>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold mb-2">Description</h4>
-                          <p className="text-muted-foreground">{pkg.description}</p>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="text-2xl font-bold">{pkg.price}</span>
-                            <span className="text-muted-foreground ml-2">per person</span>
-                          </div>
-                          <Button variant="hero" onClick={() => setShowBookingForm(true)}>
-                            Book This Package
-                          </Button>
-                        </div>
+                  <CardHeader>
+                    <CardTitle className="text-xl">{pkg.title}</CardTitle>
+                    <CardDescription className="text-sm">
+                      {pkg.description}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground mb-4">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        {pkg.duration}
                       </div>
-                    </DialogContent>
-                  </Dialog>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        {pkg.location}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Max {pkg.max_guests}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Star className="h-4 w-4 fill-current text-sunset" />
+                        4.8
+                      </div>
+                    </div>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button className="w-full" variant="ocean" onClick={() => setSelectedPackage(pkg)}>
+                          View Details
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[600px]">
+                        <DialogHeader>
+                          <DialogTitle>{selectedPackage?.title}</DialogTitle>
+                          <DialogDescription>
+                            Complete package details and booking information
+                          </DialogDescription>
+                        </DialogHeader>
+                        {selectedPackage && (
+                          <div className="grid gap-6">
+                            <img 
+                              src={getPackageImage(selectedPackage, packages.indexOf(selectedPackage))} 
+                              alt={selectedPackage.title}
+                              className="w-full h-64 object-cover rounded-lg"
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4" />
+                                <span className="text-sm">{selectedPackage.duration}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-4 w-4" />
+                                <span className="text-sm">{selectedPackage.location}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                <span className="text-sm">Max {selectedPackage.max_guests} guests</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Star className="h-4 w-4 fill-current text-sunset" />
+                                <span className="text-sm">4.8 rating</span>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-semibold mb-2">Description</h4>
+                              <p className="text-muted-foreground">{selectedPackage.description}</p>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-2xl font-bold">${selectedPackage.price}</span>
+                                <span className="text-muted-foreground ml-2">per person</span>
+                              </div>
+                              <Button variant="hero" onClick={() => setShowBookingForm(true)}>
+                                Book This Package
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -379,58 +410,51 @@ const HomePage = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {newsItems.map((item) => (
-              <Card key={item.id} className="hover:shadow-card transition-shadow duration-300">
-                <CardHeader>
-                  <div className="flex justify-between items-start mb-2">
-                    <Badge variant="secondary">{item.category}</Badge>
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(item.date).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <CardTitle className="text-lg">{item.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4">{item.excerpt}</p>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" className="p-0 h-auto" onClick={() => setSelectedNews(item)}>
-                        Read More
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
-                      <DialogHeader>
-                        <DialogTitle>{item.title}</DialogTitle>
-                        <DialogDescription>
-                          {item.category} • {new Date(item.date).toLocaleDateString()}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="grid gap-4">
-                        <p className="text-muted-foreground leading-relaxed">
-                          {item.excerpt}
-                        </p>
-                        <div className="bg-muted/50 p-4 rounded-lg">
-                          <p className="text-sm leading-relaxed">
-                            {item.id === 1 && "Our new sustainable travel initiatives include carbon offset programs, partnerships with eco-friendly accommodations, and support for local conservation efforts. We believe in responsible tourism that preserves the beauty of our destinations for future generations."}
-                            {item.id === 2 && "Take advantage of our early bird special and save 30% on all Alpine Adventure packages when you book before March 31st. This includes our popular Swiss Alps expedition, Austrian mountain tours, and French Alpine experiences."}
-                            {item.id === 3 && "Stay updated with the latest travel requirements including vaccination certificates, COVID-19 testing protocols, and destination-specific safety guidelines. Your safety is our top priority."}
-                          </p>
-                        </div>
-                        <Button variant="hero" className="w-fit" onClick={() => toast({
-                          title: "Thank you for reading!",
-                          description: "Stay tuned for more updates and travel news.",
-                        })}>
-                          Subscribe to Newsletter
+          {news.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No news updates available at the moment.</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {news.map((item) => (
+                <Card key={item.id} className="hover:shadow-card transition-shadow duration-300">
+                  <CardHeader>
+                    <div className="flex justify-between items-start mb-2">
+                      <Badge variant="secondary">{item.category}</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(item.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <CardTitle className="text-lg">{item.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground mb-4">{item.excerpt}</p>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" className="p-0 h-auto" onClick={() => setSelectedNews(item)}>
+                          Read More
+                          <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[600px]">
+                        <DialogHeader>
+                          <DialogTitle>{selectedNews?.title}</DialogTitle>
+                          <DialogDescription>
+                            {selectedNews?.category} • {selectedNews && new Date(selectedNews.created_at).toLocaleDateString()}
+                          </DialogDescription>
+                        </DialogHeader>
+                        {selectedNews && (
+                          <div className="grid gap-4">
+                            <p className="text-muted-foreground">{selectedNews.content}</p>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
