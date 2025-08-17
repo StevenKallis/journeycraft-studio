@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Plus, Edit, Trash2, FileText, Image, MapPin, Calendar, Users, DollarSign } from "lucide-react";
+import { Upload, Plus, Edit, Trash2, FileText, Image, MapPin, Calendar, Users, DollarSign, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // Mock data for demonstration
@@ -60,6 +61,7 @@ const mockNews = [
 ];
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const [packages, setPackages] = useState(mockPackages);
   const [news, setNews] = useState(mockNews);
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
@@ -156,6 +158,17 @@ const AdminDashboard = () => {
       {/* Header */}
       <div className="bg-hero-gradient text-white py-8 px-4">
         <div className="container mx-auto">
+          <div className="flex items-center gap-4 mb-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/')}
+              className="text-white hover:bg-white/20 gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Button>
+          </div>
           <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
           <p className="text-white/80">Manage your travel packages and content</p>
         </div>
