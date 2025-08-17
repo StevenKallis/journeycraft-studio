@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,62 +8,43 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Plus, Edit, Trash2, FileText, Image, MapPin, Calendar, Users, DollarSign, ArrowLeft } from "lucide-react";
+import { Upload, Plus, Edit, Trash2, FileText, Image, MapPin, Calendar, Users, DollarSign, ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock data for demonstration
-const mockPackages = [
-  {
-    id: 1,
-    title: "Mountain Adventure Escape",
-    description: "Experience breathtaking mountain views and thrilling adventures.",
-    price: 2499,
-    duration: "7 days",
-    location: "Swiss Alps",
-    maxGuests: 12,
-    images: ["mountain1.jpg", "mountain2.jpg"],
-    pdfs: ["mountain-itinerary.pdf"],
-    status: "active"
-  },
-  {
-    id: 2,
-    title: "Tropical Paradise Getaway",
-    description: "Relax in luxury overwater bungalows with pristine beaches.",
-    price: 3299,
-    duration: "10 days",
-    location: "Maldives",
-    maxGuests: 8,
-    images: ["beach1.jpg", "beach2.jpg"],
-    pdfs: ["beach-guide.pdf"],
-    status: "active"
-  }
-];
+// Types for our data
+interface Package {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  duration: string;
+  location: string;
+  max_guests: number;
+  images: string[];
+  pdfs: string[];
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
 
-const mockNews = [
-  {
-    id: 1,
-    title: "New Sustainable Travel Initiatives",
-    excerpt: "We're proud to announce our commitment to eco-friendly travel options.",
-    content: "Full content here...",
-    category: "Sustainability",
-    date: "2024-01-15",
-    status: "published"
-  },
-  {
-    id: 2,
-    title: "Early Bird Special: 30% Off Alpine Adventures",
-    excerpt: "Book your mountain getaway before March and save big.",
-    content: "Full content here...",
-    category: "Promotions",
-    date: "2024-01-10",
-    status: "draft"
-  }
-];
+interface NewsItem {
+  id: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  category: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [packages, setPackages] = useState(mockPackages);
-  const [news, setNews] = useState(mockNews);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [newPackage, setNewPackage] = useState({
     title: "",
@@ -82,10 +63,76 @@ const AdminDashboard = () => {
   
   const { toast } = useToast();
 
+  useEffect(() => {
+    fetchPackages();
+    fetchNews();
+  }, []);
+
+  const fetchPackages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setPackages(data || []);
+    } catch (error) {
+      console.error('Error fetching packages:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch packages",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchNews = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('news')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setNews(data || []);
+    } catch (error) {
+      console.error('Error fetching news:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch news",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const uploadFiles = async (files: File[]): Promise<string[]> => {
+    const uploadedPaths: string[] = [];
+    
+    for (const file of files) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('package-files')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Error uploading file:', uploadError);
+        throw uploadError;
+      }
+
+      uploadedPaths.push(fileName);
+    }
+    
+    return uploadedPaths;
+  };
+
   const handleFileUpload = (files: FileList | null) => {
     if (!files) return;
-    
-    // In real implementation, upload to Supabase Storage
     setSelectedFiles(files);
     toast({
       title: "Files selected",
@@ -93,65 +140,160 @@ const AdminDashboard = () => {
     });
   };
 
-  const handlePackageSubmit = (e: React.FormEvent) => {
+  const handlePackageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUploading(true);
     
-    // In real implementation, save to Supabase
-    const packageData = {
-      id: packages.length + 1,
-      ...newPackage,
-      price: parseFloat(newPackage.price),
-      maxGuests: parseInt(newPackage.maxGuests),
-      images: selectedFiles ? Array.from(selectedFiles).filter(f => f.type.startsWith('image/')).map(f => f.name) : [],
-      pdfs: selectedFiles ? Array.from(selectedFiles).filter(f => f.type === 'application/pdf').map(f => f.name) : [],
-      status: "active"
-    };
-    
-    setPackages([...packages, packageData]);
-    setNewPackage({ title: "", description: "", price: "", duration: "", location: "", maxGuests: "" });
-    setSelectedFiles(null);
-    
-    toast({
-      title: "Package created",
-      description: "Travel package has been successfully created"
-    });
+    try {
+      let uploadedImages: string[] = [];
+      let uploadedPdfs: string[] = [];
+      
+      if (selectedFiles) {
+        const imageFiles = Array.from(selectedFiles).filter(f => f.type.startsWith('image/'));
+        const pdfFiles = Array.from(selectedFiles).filter(f => f.type === 'application/pdf');
+        
+        if (imageFiles.length > 0) {
+          uploadedImages = await uploadFiles(imageFiles);
+        }
+        if (pdfFiles.length > 0) {
+          uploadedPdfs = await uploadFiles(pdfFiles);
+        }
+      }
+      
+      const { data, error } = await supabase
+        .from('packages')
+        .insert([{
+          title: newPackage.title,
+          description: newPackage.description,
+          price: parseFloat(newPackage.price),
+          duration: newPackage.duration,
+          location: newPackage.location,
+          max_guests: parseInt(newPackage.maxGuests),
+          images: uploadedImages,
+          pdfs: uploadedPdfs,
+          status: 'active'
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      setPackages([data, ...packages]);
+      setNewPackage({ title: "", description: "", price: "", duration: "", location: "", maxGuests: "" });
+      setSelectedFiles(null);
+      
+      toast({
+        title: "Package created",
+        description: "Travel package has been successfully created"
+      });
+    } catch (error) {
+      console.error('Error creating package:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create package",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const handleNewsSubmit = (e: React.FormEvent) => {
+  const handleNewsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUploading(true);
     
-    // In real implementation, save to Supabase
-    const newsData = {
-      id: news.length + 1,
-      ...newNews,
-      date: new Date().toISOString().split('T')[0],
-      status: "published"
-    };
-    
-    setNews([...news, newsData]);
-    setNewNews({ title: "", excerpt: "", content: "", category: "" });
-    
-    toast({
-      title: "News published",
-      description: "News article has been successfully published"
-    });
+    try {
+      const { data, error } = await supabase
+        .from('news')
+        .insert([{
+          title: newNews.title,
+          excerpt: newNews.excerpt,
+          content: newNews.content,
+          category: newNews.category,
+          status: 'published'
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      setNews([data, ...news]);
+      setNewNews({ title: "", excerpt: "", content: "", category: "" });
+      
+      toast({
+        title: "News published",
+        description: "News article has been successfully published"
+      });
+    } catch (error) {
+      console.error('Error creating news:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create news article",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const deletePackage = (id: number) => {
-    setPackages(packages.filter(pkg => pkg.id !== id));
-    toast({
-      title: "Package deleted",
-      description: "Travel package has been removed"
-    });
+  const deletePackage = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('packages')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setPackages(packages.filter(pkg => pkg.id !== id));
+      toast({
+        title: "Package deleted",
+        description: "Travel package has been removed"
+      });
+    } catch (error) {
+      console.error('Error deleting package:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete package",
+        variant: "destructive",
+      });
+    }
   };
 
-  const deleteNews = (id: number) => {
-    setNews(news.filter(item => item.id !== id));
-    toast({
-      title: "News deleted",
-      description: "News article has been removed"
-    });
+  const deleteNews = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('news')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setNews(news.filter(item => item.id !== id));
+      toast({
+        title: "News deleted",
+        description: "News article has been removed"
+      });
+    } catch (error) {
+      console.error('Error deleting news:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete news article",
+        variant: "destructive",
+      });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -282,7 +424,16 @@ const AdminDashboard = () => {
 
                     <div className="flex justify-end gap-2">
                       <Button type="button" variant="outline">Cancel</Button>
-                      <Button type="submit" variant="hero">Create Package</Button>
+                      <Button type="submit" variant="hero" disabled={uploading}>
+                        {uploading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create Package"
+                        )}
+                      </Button>
                     </div>
                   </form>
                 </DialogContent>
@@ -314,10 +465,10 @@ const AdminDashboard = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        <span>${pkg.price}</span>
-                      </div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          <span>${pkg.price}</span>
+                        </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         <span>{pkg.duration}</span>
@@ -326,10 +477,10 @@ const AdminDashboard = () => {
                         <MapPin className="h-4 w-4 text-muted-foreground" />
                         <span>{pkg.location}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span>Max {pkg.maxGuests}</span>
-                      </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span>Max {pkg.max_guests}</span>
+                        </div>
                     </div>
                     
                     <div className="flex gap-4">
@@ -427,7 +578,16 @@ const AdminDashboard = () => {
 
                     <div className="flex justify-end gap-2">
                       <Button type="button" variant="outline">Cancel</Button>
-                      <Button type="submit" variant="hero">Publish Article</Button>
+                      <Button type="submit" variant="hero" disabled={uploading}>
+                        {uploading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Publishing...
+                          </>
+                        ) : (
+                          "Publish Article"
+                        )}
+                      </Button>
                     </div>
                   </form>
                 </DialogContent>
@@ -465,7 +625,7 @@ const AdminDashboard = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground">
-                      Published on {new Date(item.date).toLocaleDateString()}
+                      Published on {new Date(item.created_at).toLocaleDateString()}
                     </p>
                   </CardContent>
                 </Card>
