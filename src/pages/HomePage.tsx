@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Calendar, MapPin, Users, Star, ArrowRight, Play, X, LogIn, LogOut, Loader2 } from "lucide-react";
+import { Calendar, MapPin, Users, Star, ArrowRight, Play, X, LogIn, LogOut, Loader2, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-travel.jpg";
 import mountainPackage from "@/assets/mountain-package.jpg";
@@ -379,6 +379,27 @@ const HomePage = () => {
                               <h4 className="font-semibold mb-2">Description</h4>
                               <p className="text-muted-foreground">{selectedPackage.description}</p>
                             </div>
+                            {selectedPackage.pdfs && selectedPackage.pdfs.length > 0 && (
+                              <div>
+                                <h4 className="font-semibold mb-2">Package Documents</h4>
+                                <div className="flex gap-2 flex-wrap">
+                                  {selectedPackage.pdfs.map((pdf, idx) => (
+                                    <Button
+                                      key={idx}
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        const url = supabase.storage.from('package-files').getPublicUrl(pdf).data.publicUrl;
+                                        window.open(url, '_blank');
+                                      }}
+                                    >
+                                      <FileText className="h-4 w-4 mr-2" />
+                                      {pdf.length > 15 ? pdf.substring(0, 15) + '...' : pdf}
+                                    </Button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             <div className="flex items-center justify-between">
                               <div>
                                 <span className="text-2xl font-bold">${selectedPackage.price}</span>

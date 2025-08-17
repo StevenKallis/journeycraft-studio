@@ -46,6 +46,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
+  const [editingPackage, setEditingPackage] = useState<Package | null>(null);
   const [newPackage, setNewPackage] = useState({
     title: "",
     description: "",
@@ -191,6 +192,69 @@ const AdminDashboard = () => {
       toast({
         title: "Error",
         description: "Failed to create package",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleEditPackageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPackage) return;
+    
+    setUploading(true);
+    
+    try {
+      let uploadedImages = editingPackage.images;
+      let uploadedPdfs = editingPackage.pdfs;
+      
+      if (selectedFiles) {
+        const imageFiles = Array.from(selectedFiles).filter(f => f.type.startsWith('image/'));
+        const pdfFiles = Array.from(selectedFiles).filter(f => f.type === 'application/pdf');
+        
+        if (imageFiles.length > 0) {
+          const newImages = await uploadFiles(imageFiles);
+          uploadedImages = [...uploadedImages, ...newImages];
+        }
+        if (pdfFiles.length > 0) {
+          const newPdfs = await uploadFiles(pdfFiles);
+          uploadedPdfs = [...uploadedPdfs, ...newPdfs];
+        }
+      }
+      
+      const { data, error } = await supabase
+        .from('packages')
+        .update({
+          title: newPackage.title,
+          description: newPackage.description,
+          price: parseFloat(newPackage.price),
+          duration: newPackage.duration,
+          location: newPackage.location,
+          max_guests: parseInt(newPackage.maxGuests),
+          images: uploadedImages,
+          pdfs: uploadedPdfs
+        })
+        .eq('id', editingPackage.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      setPackages(packages.map(pkg => pkg.id === editingPackage.id ? data : pkg));
+      setEditingPackage(null);
+      setNewPackage({ title: "", description: "", price: "", duration: "", location: "", maxGuests: "" });
+      setSelectedFiles(null);
+      
+      toast({
+        title: "Package updated",
+        description: "Travel package has been successfully updated"
+      });
+    } catch (error) {
+      console.error('Error updating package:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update package",
         variant: "destructive",
       });
     } finally {
@@ -450,9 +514,167 @@ const AdminDashboard = () => {
                         <CardDescription>{pkg.description}</CardDescription>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setEditingPackage(pkg);
+                                setNewPackage({
+                                  title: pkg.title,
+                                  description: pkg.description,
+                                  price: pkg.price.toString(),
+                                  duration: pkg.duration,
+                                  location: pkg.location,
+                                  maxGuests: pkg.max_guests.toString()
+                                });
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>Edit Travel Package</DialogTitle>
+                              <DialogDescription>
+                                Update package details and add more files
+                              </DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleEditPackageSubmit} className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label htmlFor="editTitle">Package Title</Label>
+                                  <Input
+                                    id="editTitle"
+                                    value={newPackage.title}
+                                    onChange={(e) => setNewPackage({...newPackage, title: e.target.value})}
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="editLocation">Location</Label>
+                                  <Input
+                                    id="editLocation"
+                                    value={newPackage.location}
+                                    onChange={(e) => setNewPackage({...newPackage, location: e.target.value})}
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="editDescription">Description</Label>
+                                <Textarea
+                                  id="editDescription"
+                                  value={newPackage.description}
+                                  onChange={(e) => setNewPackage({...newPackage, description: e.target.value})}
+                                  required
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                  <Label htmlFor="editPrice">Price ($)</Label>
+                                  <Input
+                                    id="editPrice"
+                                    type="number"
+                                    value={newPackage.price}
+                                    onChange={(e) => setNewPackage({...newPackage, price: e.target.value})}
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="editDuration">Duration</Label>
+                                  <Input
+                                    id="editDuration"
+                                    value={newPackage.duration}
+                                    onChange={(e) => setNewPackage({...newPackage, duration: e.target.value})}
+                                    placeholder="e.g., 7 days"
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="editMaxGuests">Max Guests</Label>
+                                  <Input
+                                    id="editMaxGuests"
+                                    type="number"
+                                    value={newPackage.maxGuests}
+                                    onChange={(e) => setNewPackage({...newPackage, maxGuests: e.target.value})}
+                                    required
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <Label>Current Files</Label>
+                                <div className="flex gap-4 mb-2">
+                                  <div>
+                                    <p className="text-sm font-medium">Images ({editingPackage?.images.length || 0})</p>
+                                    <div className="flex gap-1">
+                                      {editingPackage?.images.map((img, idx) => (
+                                        <Badge key={idx} variant="secondary" className="text-xs">
+                                          <Image className="h-3 w-3 mr-1" />
+                                          {img}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium">PDFs ({editingPackage?.pdfs.length || 0})</p>
+                                    <div className="flex gap-1">
+                                      {editingPackage?.pdfs.map((pdf, idx) => (
+                                        <Badge key={idx} variant="secondary" className="text-xs">
+                                          <FileText className="h-3 w-3 mr-1" />
+                                          {pdf}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <Label htmlFor="editFiles">Add More Images & PDFs</Label>
+                                <Input
+                                  id="editFiles"
+                                  type="file"
+                                  multiple
+                                  accept="image/*,.pdf"
+                                  onChange={(e) => handleFileUpload(e.target.files)}
+                                  className="cursor-pointer"
+                                />
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  Select additional images and PDF files for this package
+                                </p>
+                              </div>
+
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  type="button" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingPackage(null);
+                                    setNewPackage({ title: "", description: "", price: "", duration: "", location: "", maxGuests: "" });
+                                    setSelectedFiles(null);
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button type="submit" variant="hero" disabled={uploading}>
+                                  {uploading ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                      Updating...
+                                    </>
+                                  ) : (
+                                    "Update Package"
+                                  )}
+                                </Button>
+                              </div>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
                         <Button 
                           variant="destructive" 
                           size="sm"
@@ -497,12 +719,21 @@ const AdminDashboard = () => {
                       </div>
                       <div>
                         <Label className="text-sm font-medium">PDFs ({pkg.pdfs.length})</Label>
-                        <div className="flex gap-1 mt-1">
+                        <div className="flex gap-1 mt-1 flex-wrap">
                           {pkg.pdfs.map((pdf, idx) => (
-                            <Badge key={idx} variant="secondary" className="text-xs">
+                            <Button
+                              key={idx}
+                              variant="secondary"
+                              size="sm"
+                              className="text-xs h-6"
+                              onClick={() => {
+                                const url = supabase.storage.from('package-files').getPublicUrl(pdf).data.publicUrl;
+                                window.open(url, '_blank');
+                              }}
+                            >
                               <FileText className="h-3 w-3 mr-1" />
-                              {pdf}
-                            </Badge>
+                              {pdf.length > 20 ? pdf.substring(0, 20) + '...' : pdf}
+                            </Button>
                           ))}
                         </div>
                       </div>
