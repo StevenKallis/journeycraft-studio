@@ -15,6 +15,7 @@ import heroImage from "@/assets/hero-travel.jpg";
 import mountainPackage from "@/assets/mountain-package.jpg";
 import beachPackage from "@/assets/beach-package.jpg";
 import cityPackage from "@/assets/city-package.jpg";
+import { BookingForm } from "@/components/BookingForm";
 
 // Default images for packages without uploads
 const defaultImages = [mountainPackage, beachPackage, cityPackage];
@@ -73,8 +74,10 @@ const HomePage = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
-  const [showBookingForm, setShowBookingForm] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [bookingType, setBookingType] = useState<'package' | 'ticket'>('package');
+  const [bookingItem, setBookingItem] = useState<Package | Ticket | null>(null);
   const { toast } = useToast();
   const { user, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -146,6 +149,44 @@ const HomePage = () => {
         description: "Failed to load air tickets",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleBookNow = (item: Package | Ticket, type: 'package' | 'ticket') => {
+    setBookingItem(item);
+    setBookingType(type);
+    setShowBookingForm(true);
+  };
+
+  const getBookingDetails = () => {
+    if (!bookingItem) return {
+      title: '',
+      price: 0,
+      currency: 'USD'
+    };
+    
+    if (bookingType === 'package') {
+      const pkg = bookingItem as Package;
+      return {
+        title: pkg.title,
+        price: pkg.price,
+        duration: pkg.duration,
+        location: pkg.location,
+        maxGuests: pkg.max_guests
+      };
+    } else {
+      const ticket = bookingItem as Ticket;
+      return {
+        price: ticket.price,
+        currency: ticket.currency,
+        origin: ticket.origin,
+        destination: ticket.destination,
+        departureDate: ticket.departure_date,
+        returnDate: ticket.return_date,
+        airline: ticket.airline,
+        flightClass: ticket.flight_class,
+        availableSeats: ticket.available_seats
+      };
     }
   };
 
@@ -448,7 +489,7 @@ const HomePage = () => {
                                 <span className="text-2xl font-bold">${selectedPackage.price}</span>
                                 <span className="text-muted-foreground ml-2">per person</span>
                               </div>
-                              <Button variant="hero" onClick={() => setShowBookingForm(true)}>
+                              <Button variant="hero" onClick={() => handleBookNow(selectedPackage, 'package')}>
                                 Book This Package
                               </Button>
                             </div>
@@ -546,7 +587,10 @@ const HomePage = () => {
                       </p>
                     )}
 
-                    <Button className="w-full bg-hero-gradient hover:opacity-90 text-white">
+                    <Button 
+                      className="w-full bg-hero-gradient hover:opacity-90 text-white"
+                      onClick={() => handleBookNow(ticket, 'ticket')}
+                    >
                       Book Now
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
@@ -660,6 +704,14 @@ const HomePage = () => {
           </div>
         </div>
       </footer>
+
+      {/* Booking Form */}
+      <BookingForm
+        isOpen={showBookingForm}
+        onClose={() => setShowBookingForm(false)}
+        type={bookingType}
+        bookingDetails={getBookingDetails()}
+      />
     </div>
   );
 };
