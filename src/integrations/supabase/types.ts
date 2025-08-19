@@ -119,6 +119,63 @@ export type Database = {
         }
         Relationships: []
       }
+      tickets: {
+        Row: {
+          airline: string
+          available_seats: number
+          created_at: string
+          currency: string
+          departure_date: string
+          description: string | null
+          destination: string
+          flight_class: string
+          flight_duration: string | null
+          id: string
+          images: string[] | null
+          origin: string
+          price: number
+          return_date: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          airline: string
+          available_seats?: number
+          created_at?: string
+          currency?: string
+          departure_date: string
+          description?: string | null
+          destination: string
+          flight_class?: string
+          flight_duration?: string | null
+          id?: string
+          images?: string[] | null
+          origin: string
+          price: number
+          return_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          airline?: string
+          available_seats?: number
+          created_at?: string
+          currency?: string
+          departure_date?: string
+          description?: string | null
+          destination?: string
+          flight_class?: string
+          flight_duration?: string | null
+          id?: string
+          images?: string[] | null
+          origin?: string
+          price?: number
+          return_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

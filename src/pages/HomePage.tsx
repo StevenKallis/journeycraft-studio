@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Calendar, MapPin, Users, Star, ArrowRight, Play, X, LogIn, LogOut, Loader2, FileText } from "lucide-react";
+import { Calendar, MapPin, Users, Star, ArrowRight, Play, X, LogIn, LogOut, Loader2, FileText, Plane, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-travel.jpg";
 import mountainPackage from "@/assets/mountain-package.jpg";
@@ -46,9 +46,29 @@ interface NewsItem {
   updated_at: string;
 }
 
+interface Ticket {
+  id: string;
+  origin: string;
+  destination: string;
+  departure_date: string;
+  return_date?: string;
+  airline: string;
+  price: number;
+  currency: string;
+  flight_class: string;
+  available_seats: number;
+  flight_duration?: string;
+  description?: string;
+  images: string[];
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const HomePage = () => {
   const [packages, setPackages] = useState<Package[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
@@ -62,6 +82,7 @@ const HomePage = () => {
   useEffect(() => {
     fetchPackages();
     fetchNews();
+    fetchTickets();
   }, []);
 
   const fetchPackages = async () => {
@@ -102,6 +123,27 @@ const HomePage = () => {
       toast({
         title: "Error",
         description: "Failed to load news updates",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchTickets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(8);
+      
+      if (error) throw error;
+      setTickets(data || []);
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load air tickets",
         variant: "destructive",
       });
     }
@@ -155,6 +197,7 @@ const HomePage = () => {
           </h1>
           <div className="flex gap-4">
             <Button variant="ghost" onClick={() => scrollToSection('packages')}>Packages</Button>
+            <Button variant="ghost" onClick={() => scrollToSection('tickets')}>Air Tickets</Button>
             <Button variant="ghost" onClick={() => scrollToSection('about')}>About</Button>
             <Button variant="ghost" onClick={() => scrollToSection('contact')}>Contact</Button>
             {user ? (
@@ -413,6 +456,100 @@ const HomePage = () => {
                         )}
                       </DialogContent>
                     </Dialog>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Air Tickets Section */}
+      <section id="tickets" className="py-20 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-4">Air Tickets</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Find the best flight deals for destinations around the world
+            </p>
+          </div>
+          
+          {loading ? (
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading air tickets...</p>
+            </div>
+          ) : tickets.length === 0 ? (
+            <div className="text-center py-12">
+              <Plane className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-xl font-semibold mb-2">No Air Tickets Available</h3>
+              <p className="text-muted-foreground">Check back soon for exciting flight deals!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {tickets.map((ticket) => (
+                <Card key={ticket.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {ticket.flight_class}
+                      </Badge>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-hero">
+                          {ticket.price} {ticket.currency}
+                        </div>
+                      </div>
+                    </div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Plane className="h-5 w-5 text-hero" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-normal text-muted-foreground">
+                          {ticket.origin}
+                        </span>
+                        <span className="text-xs text-muted-foreground">→</span>
+                        <span className="text-sm font-normal text-muted-foreground">
+                          {ticket.destination}
+                        </span>
+                      </div>
+                    </CardTitle>
+                    <CardDescription className="text-sm">
+                      {ticket.airline}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span>{new Date(ticket.departure_date).toLocaleDateString()}</span>
+                      </div>
+                      {ticket.return_date && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span>Return: {new Date(ticket.return_date).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {ticket.flight_duration && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span>{ticket.flight_duration}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-sm">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span>{ticket.available_seats} seats available</span>
+                      </div>
+                    </div>
+                    
+                    {ticket.description && (
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                        {ticket.description}
+                      </p>
+                    )}
+
+                    <Button className="w-full bg-hero-gradient hover:opacity-90 text-white">
+                      Book Now
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
                   </CardContent>
                 </Card>
               ))}

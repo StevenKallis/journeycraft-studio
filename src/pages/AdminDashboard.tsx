@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Plus, Edit, Trash2, FileText, Image, MapPin, Calendar, Users, DollarSign, ArrowLeft, Loader2 } from "lucide-react";
+import { Upload, Plus, Edit, Trash2, FileText, Image, MapPin, Calendar, Users, DollarSign, ArrowLeft, Loader2, Plane, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -39,10 +39,30 @@ interface NewsItem {
   updated_at: string;
 }
 
+interface Ticket {
+  id: string;
+  origin: string;
+  destination: string;
+  departure_date: string;
+  return_date?: string;
+  airline: string;
+  price: number;
+  currency: string;
+  flight_class: string;
+  available_seats: number;
+  flight_duration?: string;
+  description?: string;
+  images: string[];
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [packages, setPackages] = useState<Package[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
@@ -61,12 +81,26 @@ const AdminDashboard = () => {
     content: "",
     category: ""
   });
+  const [newTicket, setNewTicket] = useState({
+    origin: "",
+    destination: "",
+    departure_date: "",
+    return_date: "",
+    airline: "",
+    price: "",
+    currency: "USD",
+    flight_class: "economy",
+    available_seats: "",
+    flight_duration: "",
+    description: ""
+  });
   
   const { toast } = useToast();
 
   useEffect(() => {
     fetchPackages();
     fetchNews();
+    fetchTickets();
   }, []);
 
   const fetchPackages = async () => {
@@ -104,6 +138,25 @@ const AdminDashboard = () => {
       toast({
         title: "Error",
         description: "Failed to fetch news",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchTickets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tickets')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setTickets(data || []);
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch tickets",
         variant: "destructive",
       });
     }
@@ -348,6 +401,98 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleTicketSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUploading(true);
+    
+    try {
+      let uploadedImages: string[] = [];
+      
+      if (selectedFiles) {
+        const imageFiles = Array.from(selectedFiles).filter(f => f.type.startsWith('image/'));
+        if (imageFiles.length > 0) {
+          uploadedImages = await uploadFiles(imageFiles);
+        }
+      }
+      
+      const { data, error } = await supabase
+        .from('tickets')
+        .insert([{
+          origin: newTicket.origin,
+          destination: newTicket.destination,
+          departure_date: newTicket.departure_date,
+          return_date: newTicket.return_date || null,
+          airline: newTicket.airline,
+          price: parseFloat(newTicket.price),
+          currency: newTicket.currency,
+          flight_class: newTicket.flight_class,
+          available_seats: parseInt(newTicket.available_seats),
+          flight_duration: newTicket.flight_duration || null,
+          description: newTicket.description || null,
+          images: uploadedImages,
+          status: 'active'
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      setTickets([data, ...tickets]);
+      setNewTicket({
+        origin: "",
+        destination: "",
+        departure_date: "",
+        return_date: "",
+        airline: "",
+        price: "",
+        currency: "USD",
+        flight_class: "economy",
+        available_seats: "",
+        flight_duration: "",
+        description: ""
+      });
+      setSelectedFiles(null);
+      
+      toast({
+        title: "Ticket created",
+        description: "Air ticket has been successfully created"
+      });
+    } catch (error) {
+      console.error('Error creating ticket:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create ticket",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const deleteTicket = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('tickets')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setTickets(tickets.filter(ticket => ticket.id !== id));
+      toast({
+        title: "Ticket deleted",
+        description: "Air ticket has been removed"
+      });
+    } catch (error) {
+      console.error('Error deleting ticket:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete ticket",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -382,8 +527,9 @@ const AdminDashboard = () => {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="packages" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="packages">Travel Packages</TabsTrigger>
+            <TabsTrigger value="tickets">Air Tickets</TabsTrigger>
             <TabsTrigger value="news">News & Updates</TabsTrigger>
             <TabsTrigger value="files">File Management</TabsTrigger>
           </TabsList>
@@ -738,6 +884,258 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* Air Tickets Tab */}
+          <TabsContent value="tickets" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-3xl font-bold">Air Tickets</h2>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="hero">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add New Ticket
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Create New Air Ticket</DialogTitle>
+                    <DialogDescription>
+                      Add a new air ticket with flight details
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleTicketSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="origin">Origin</Label>
+                        <Input
+                          id="origin"
+                          value={newTicket.origin}
+                          onChange={(e) => setNewTicket({...newTicket, origin: e.target.value})}
+                          placeholder="e.g., New York, USA"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="destination">Destination</Label>
+                        <Input
+                          id="destination"
+                          value={newTicket.destination}
+                          onChange={(e) => setNewTicket({...newTicket, destination: e.target.value})}
+                          placeholder="e.g., Paris, France"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="departure_date">Departure Date</Label>
+                        <Input
+                          id="departure_date"
+                          type="date"
+                          value={newTicket.departure_date}
+                          onChange={(e) => setNewTicket({...newTicket, departure_date: e.target.value})}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="return_date">Return Date (Optional)</Label>
+                        <Input
+                          id="return_date"
+                          type="date"
+                          value={newTicket.return_date}
+                          onChange={(e) => setNewTicket({...newTicket, return_date: e.target.value})}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="airline">Airline</Label>
+                        <Input
+                          id="airline"
+                          value={newTicket.airline}
+                          onChange={(e) => setNewTicket({...newTicket, airline: e.target.value})}
+                          placeholder="e.g., Emirates Airlines"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="flight_duration">Flight Duration</Label>
+                        <Input
+                          id="flight_duration"
+                          value={newTicket.flight_duration}
+                          onChange={(e) => setNewTicket({...newTicket, flight_duration: e.target.value})}
+                          placeholder="e.g., 8h 30m"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="price">Price</Label>
+                        <Input
+                          id="price"
+                          type="number"
+                          value={newTicket.price}
+                          onChange={(e) => setNewTicket({...newTicket, price: e.target.value})}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="currency">Currency</Label>
+                        <Input
+                          id="currency"
+                          value={newTicket.currency}
+                          onChange={(e) => setNewTicket({...newTicket, currency: e.target.value})}
+                          placeholder="USD"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="available_seats">Available Seats</Label>
+                        <Input
+                          id="available_seats"
+                          type="number"
+                          value={newTicket.available_seats}
+                          onChange={(e) => setNewTicket({...newTicket, available_seats: e.target.value})}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="flight_class">Flight Class</Label>
+                      <select
+                        id="flight_class"
+                        value={newTicket.flight_class}
+                        onChange={(e) => setNewTicket({...newTicket, flight_class: e.target.value})}
+                        className="w-full p-2 border border-input bg-background rounded-md"
+                        required
+                      >
+                        <option value="economy">Economy</option>
+                        <option value="premium_economy">Premium Economy</option>
+                        <option value="business">Business</option>
+                        <option value="first">First Class</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={newTicket.description}
+                        onChange={(e) => setNewTicket({...newTicket, description: e.target.value})}
+                        placeholder="Additional flight details and amenities"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="ticketImages">Upload Images</Label>
+                      <Input
+                        id="ticketImages"
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => handleFileUpload(e.target.files)}
+                        className="cursor-pointer"
+                      />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Select images for this flight offer
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline">Cancel</Button>
+                      <Button type="submit" variant="hero" disabled={uploading}>
+                        {uploading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create Ticket"
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="grid gap-6">
+              {tickets.map((ticket) => (
+                <Card key={ticket.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-xl flex items-center gap-2">
+                          <Plane className="h-5 w-5" />
+                          {ticket.origin} → {ticket.destination}
+                        </CardTitle>
+                        <CardDescription>{ticket.airline} • {ticket.flight_class}</CardDescription>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => deleteTicket(ticket.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <span>{ticket.price} {ticket.currency}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span>{new Date(ticket.departure_date).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span>{ticket.flight_duration || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span>{ticket.available_seats} seats</span>
+                      </div>
+                    </div>
+                    
+                    {ticket.return_date && (
+                      <div className="mb-2">
+                        <Badge variant="secondary">Return: {new Date(ticket.return_date).toLocaleDateString()}</Badge>
+                      </div>
+                    )}
+                    
+                    {ticket.description && (
+                      <p className="text-sm text-muted-foreground mb-4">{ticket.description}</p>
+                    )}
+                    
+                    {ticket.images.length > 0 && (
+                      <div>
+                        <Label className="text-sm font-medium">Images ({ticket.images.length})</Label>
+                        <div className="flex gap-1 mt-1">
+                          {ticket.images.map((img, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              <Image className="h-3 w-3 mr-1" />
+                              {img}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
